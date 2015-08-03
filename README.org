@@ -1,0 +1,19 @@
+* Cl-Algo-And-Datastructures  - Little collection of algorithms and data structures
+
+** Usage
+
+** Dependencies
+
+** Installation
+
+** Author
+
++ Julien Rousé (julien.rouse@gmail.com)
+
+** Copyright
+
+Copyright (c) 2015 Julien Rousé (julien.rouse@gmail.com)
+
+** License
+
+Licensed under the WTFPL License.
