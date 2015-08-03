@@ -21,72 +21,62 @@
     (reverse res)))
 
 ;; rabin-karp
-#|
-(defun hash-string (word &key (a 48271) (n (1- (expt 2 31))) )
+
+(defun hash-string (word &key (a 48271))
   "Hash a string. Auxiliary function to roll-hash-string"
   (let ((res 0))
     (dotimes (i (length word))
       (incf res 
-	    (mod
-	     (*
-	      (char-code (aref word i))              ;value in ascii of the i-th
-	      (expt a (- (length word) (1+ i))))   ;char of word
-	     n)))
-      (setf res (mod res n))
-      res))
+	    (*
+	     (char-code (aref word i))              ;value in ascii of the i-th
+	     (expt a (- (length word) (1+ i))))   ;char of word
+	    ))
+    res))
 
-(defun make-rolling-hash (bound)
-  "following http://www.mit.edu/~kevinz/6.006/rolling-hashes.pdf,
-usage: (defvar rh (make-rolling-hash <bound>))
+(defun make-rolling-hash (&optional (base 27644437))
+  "usage: (defvar rh (make-rolling-hash))
        (funcall rh rolling-hash-value)
-       (funcall rh rolling-hash-append (char-code <character>))
-       (funcall rh rolling-hash-shift (char-code <character>))"
+       (funcall rh rolling-hash-new :text string)
+       (funcall rh rolling-hash-roll :elt (char-code <character>))"
   (let ((h 0)
-	(n 0)
-	(b bound)
-	(e 1)
-	(p 27644437)) ;;change it to a prime number between 2^62 and 2^63
-    #'(lambda (operation &optional (elt -1))
+ 	(n 0)
+	(haystack ""))
+	;(p prime)) ;;change it to a prime number between 2^62 and 2^63
+    #'(lambda (operation &key (elt -1) (text ""))
 	(ecase operation
 	  (rolling-hash-value
 	   h)
-	  (rolling-hash-append
+	  (rolling-hash-new
 	   (progn
-	     (when (< elt 0)
-	       (print "error, need another parameter"))
-	     (let* ((eprime (mod (* e b) p))
-		    (eltprime elt) 
-		    (hprime (mod (+ h (* eltprime eprime)) p)))
-	       (setf e eprime)
-	       (setf h hprime)
-	       (setf n (incf n 1))
-	       (list h n b e))))
-	  (rolling-hash-shift
+	     (setf h (hash-string text :a base))
+	     (setf n (incf n (1- (length text))))
+	     (setf haystack  text )
+	     (list h n haystack)))
+	  (rolling-hash-roll
 	   (progn
-	     (let* ((hprime (mod (/ (- h elt) b) p))
-		    (eprime (/ b e)))
-	       (setf h hprime)
-	       (setf e eprime)
-	       (setf n (decf n 1))
-	       (list h n b e))))))))
+	     (let* ((oldLetter (* (char-code (aref haystack 0)) (expt base n))) 
+		    (newHash (+ 
+			      (* base (- h oldLetter)) 
+			      elt)))  
+	       (setf h newHash)
+	       (setf haystack (format nil "~A~A" (subseq haystack 1) (code-char elt)))
+	       (list h n haystack)))))))))
 
 
 (defun new-hash (rolling-hash text)
   "Hash the text.
 Return the hash value"
-  (loop for e across text do
-       (funcall rolling-hash 'rolling-hash-append (char-code e)))
+  (funcall rolling-hash 'rolling-hash-new :text text)
   (funcall rolling-hash 'rolling-hash-value))
 
-(defun roll-hash (rolling-hash old new)
+(defun roll-hash (rolling-hash new)
   "Roll the hash so that the old char is replaced
 by the new and the hash changes accordingly.
 Return the hash value"     
-  (funcall rolling-hash 'rolling-hash-shift old)
-  (funcall rolling-hash 'rolling-hash-append new)
+  (funcall rolling-hash 'rolling-hash-roll :elt (char-code new))
   (funcall rolling-hash 'rolling-hash-value))
 
-|#
+
 
 
 (defun algo-rabin-karp (haystack  needle  &optional (bound 256))
@@ -98,19 +88,18 @@ Return the hash value"
 	 (haystack-hash (new-hash rh-haystack (subseq haystack 0 (length needle))))
 	 (res nil))
     (when (and (eql needle-hash haystack-hash) (string= needle haystack :start2 0 :end2 size-needle))
-      (push 0 res)
-    (loop for i from size-needle to (1+ (- size-haystack size-needle))  
+      (push 0 res))
+    (loop for i from size-needle to (1- size-haystack)  
        do 
 	 (setf haystack-hash 
-	       (roll-hash rh-haystack 
-			  (char-code (aref haystack (- i size-needle))) 
-			  (char-code (aref haystack i))))
+	       (roll-hash rh-haystack  
+			  (aref haystack i)))
 	 (when (and (eql needle-hash haystack-hash) 
 		    (string= needle 
 			     haystack 
-			     :start2 (- i size-needle)
-			     :end2   i))
-	   (push i res)))
+			     :start2 (- (1+ i) size-needle)
+			     :end2   (1+ i)))
+	   (push (- (1+ i) size-needle)  res)))
     (reverse res))))
 
 
