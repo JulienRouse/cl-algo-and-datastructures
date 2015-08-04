@@ -136,9 +136,30 @@ Return the hash value"
 
 
 
-
-
-
-
-		  
+(defun algo-kmp (needle haystack)
+  (let ((m 0)
+	(i 0)
+	(table (make-array (length needle)))
+	(res nil))
+    (kmp-table needle table)
+    (loop
+       while (< (+ m i) (length haystack))
+       do
+	 (cond
+	   ((eql (elt needle i) (elt haystack (+ m i)))
+	    (cond 
+	      ((eql i (1- (length needle)))
+	       (push m res)
+	       (setf i 0)
+	      
+	    (incf i 1))
+	   (t 
+	    (cond 
+	      ((> (elt table i) -1)
+	       (incf m (- i (elt table i)))
+	       (setf i (elt table i)))
+	      (t
+	       (setf i 0)
+	       (incf m 1))))))
+    (reverse res)))
 
