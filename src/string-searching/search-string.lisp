@@ -2,7 +2,8 @@
 (defpackage search-string
   (:nicknames ss)
   (:use :cl)
-  (:export :algo-naive))
+  (:export :algo-naive
+	   :algo-rabin-karp))
 (in-package :search-string)
 
 ;; naive
@@ -22,18 +23,19 @@
 
 ;; rabin-karp
 
-(defun hash-string (word &key (a 48271))
+(defun hash-string (word &key (a 48271) (modulo 32416190071))
   "Hash a string. Auxiliary function to roll-hash-string"
   (let ((res 0))
     (dotimes (i (length word))
       (incf res 
-	    (*
-	     (char-code (aref word i))              ;value in ascii of the i-th
-	     (expt a (- (length word) (1+ i))))   ;char of word
-	    ))
-    res))
+	    (mod
+	     (*
+	     (char-code (aref word i))              
+	     (mod (expt a (- (length word) (1+ i))) modulo))   
+	    modulo)))
+    (setq res (mod res modulo))))
 
-(defun make-rolling-hash (&optional (base 27644437))
+(defun make-rolling-hash (&optional (base 27644437) (modulo 32416190071))
   "usage: (defvar rh (make-rolling-hash))
        (funcall rh rolling-hash-value)
        (funcall rh rolling-hash-new :text string)
@@ -48,18 +50,22 @@
 	   h)
 	  (rolling-hash-new
 	   (progn
-	     (setf h (hash-string text :a base))
+	     (setf h (hash-string text :a base :modulo modulo))
 	     (setf n (incf n (1- (length text))))
 	     (setf haystack  text )
 	     (list h n haystack)))
 	  (rolling-hash-roll
 	   (progn
-	     (let* ((oldLetter (* (char-code (aref haystack 0)) (expt base n))) 
+	     (let* ((oldLetter (mod 
+				(* (char-code (aref haystack 0)) 
+				   (expt base n)) 
+				modulo)) 
 		    (newHash (+ 
 			      (* base (- h oldLetter)) 
 			      elt)))  
-	       (setf h newHash)
-	       (setf haystack (format nil "~A~A" (subseq haystack 1) (code-char elt)))
+	       (setf h (mod newHash modulo))
+	       (setf haystack 
+		     (format nil "~A~A" (subseq haystack 1) (code-char elt)))
 	       (list h n haystack)))))))))
 
 
@@ -78,12 +84,13 @@ Return the hash value"
 
 
 
-
-(defun algo-rabin-karp (haystack  needle  &optional (bound 256))
+;;TODO use a set/bloom filter instead of a single word to search
+(defun algo-rabin-karp (haystack  needle  &key (base 27644437) (modulo 32416190071))
+  "Rabin-Karp implementation with a rolling hash"
   (let* ((size-haystack (length haystack))
 	 (size-needle   (length needle))
-	 (rh-needle     (make-rolling-hash bound))
-	 (rh-haystack   (make-rolling-hash bound))
+	 (rh-needle     (make-rolling-hash base modulo))
+	 (rh-haystack   (make-rolling-hash base modulo))
 	 (needle-hash   (new-hash rh-needle needle))
 	 (haystack-hash (new-hash rh-haystack (subseq haystack 0 (length needle))))
 	 (res nil))
@@ -103,7 +110,29 @@ Return the hash value"
     (reverse res))))
 
 
+;;Knuth-Morris-Pratt
 
+(defun kmp-table (needle table)
+  "Precomputing for the kmp algorithm"
+  (let ((pos 2)
+	(cnd 0))
+  (setf (aref table 0) -1)
+  (setf (aref table 1) 0)
+  (loop 
+     while(< pos (length needle))
+     do
+       (cond
+	 ((eql (elt needle (1- pos))
+	       (elt needle cnd))
+	  (incf cnd 1)
+	  (setf (aref table pos) cnd)
+	  (incf pos 1))
+	 ((> cnd 0)
+	  (setf cnd (aref table cnd)))
+	 (t
+	  (setf (aref table pos) 0)
+	  (incf pos 1))))))
+    
 
 
 
