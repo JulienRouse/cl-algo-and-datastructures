@@ -3,7 +3,8 @@
   (:nicknames ss)
   (:use :cl)
   (:export :algo-naive
-	   :algo-rabin-karp))
+	   :algo-rabin-karp
+	   :algo-kmp))
 (in-package :search-string)
 
 ;; naive
@@ -113,7 +114,11 @@ Return the hash value"
 ;;Knuth-Morris-Pratt
 
 (defun kmp-table (needle table)
-  "Precomputing for the kmp algorithm"
+  "Precomputing for the kmp algorithm
+table:vector
+needle:string
+return void 
+side-effect: modify table"
   (let ((pos 2)
 	(cnd 0))
   (setf (aref table 0) -1)
@@ -137,6 +142,11 @@ Return the hash value"
 
 
 (defun algo-kmp (needle haystack)
+  "
+needle:string
+haystack:string
+return:list
+side-effect:void"
   (let ((m 0)
 	(i 0)
 	(table (make-array (length needle)))
@@ -151,8 +161,9 @@ Return the hash value"
 	      ((eql i (1- (length needle)))
 	       (push m res)
 	       (setf i 0)
-	      
-	    (incf i 1))
+	       (incf m 1))
+	      (t
+	       (incf i 1))))
 	   (t 
 	    (cond 
 	      ((> (elt table i) -1)
@@ -163,3 +174,48 @@ Return the hash value"
 	       (incf m 1))))))
     (reverse res)))
 
+;; Boyer-Moore-Horsepool
+
+(defun preprocess (needle)
+"Proprocess for the Boyer-Moore-Horsepool algorithm
+needle:string
+return:vector[255] of int"
+  (declare (optimize (debug 3) (safety 3)))
+  (let ((size-needle   (length needle))
+	(table (make-array 256 :element-type 'integer)))
+    (loop 
+       for i from 0 to 255 
+       do
+	 (setf (elt table i) size-needle))
+    (loop
+       for i from 0 to (- size-needle 2)
+       do
+	 (setf 
+	  (aref 
+	   table 
+	   (char-code (char needle i)))
+	  (- size-needle 1 i)))
+    table))
+
+(defun algo-boyer-moore-horsepool (needle haystack)
+  (let ((table (preprocess needle))
+	(size-needle (length needle))
+	(size-haystack (length haystack))
+	(skip 0)
+	(i  0)
+	(res nil))
+    (loop  
+       while (>= (- size-haystack skip) size-needle)
+       do
+	 (setf i (1- size-needle))
+	 (loop 
+	    while (and (> i -1) (eql (char haystack (+ skip i)) (char needle i)))
+	    do
+	      (when (eql i 0)
+		(push skip res))
+	      (decf i 1))
+	 (incf skip (aref 
+		     table 
+		     (char-code (char haystack (1- (+ skip size-needle)))))))
+    (reverse res)))
+ 
