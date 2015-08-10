@@ -62,8 +62,12 @@ Throw an error if the set was already built"))
       (princ "A set is already built")
       (map 'list 
 	   #'(lambda (x)
-	       (incf (slot-value <set> 'count) 1)
-	       (setf (gethash x (slot-value <set> 'table)) t))
+	       (if (not (gethash x (slot-value <set> 'table)))
+		   (progn 
+		     (incf (slot-value <set> 'count) 1)
+		     (setf (gethash x (slot-value <set> 'table)) t)
+		     x)
+		   nil))
 	   (flatten rest)))))
 		 
 (defmethod enumerate ((<set> <static-set>))
@@ -73,3 +77,40 @@ Throw an error if the set was already built"))
   (if (typep sequence 'sequence)
       (build <set> (map 'list #'identity sequence))
       (print "build-from needs a sequence as 2nd argument")))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defgeneric union-set (S TT)
+  (:documentation "The union of the two specified set"))
+
+(defgeneric intersection-set (S TT)
+  (:documentation "The interection of the two specified set"))
+
+(defgeneric difference-set (S TT)
+  (:documentation "The difference of the two specified set"))
+
+(defgeneric subset-set-p (S TT)
+  (:documentation "A predicate that tests whether the set 
+S is a subset of set T."))
+
+(defmethod union-set ((S <static-set>) (TT <static-set>))
+  (let ((res  (make-instance '<static-set>)))
+    (build-from  res
+		 (concatenate 'list (enumerate S) (enumerate TT)))
+    res))
+
+(defmethod intersection-set ((S <static-set>) (TT <static-set>))
+  (let ((res (make-instance '<static-set>)))
+    (build-from res 
+		(intersection (enumerate S) (enumerate TT)))
+    res))
+
+
+
+
+(defmethod  difference-set ((S <static-set>) (TT <static-set))
+  (let ((res (make-instance '<static-set>)))
+    (build-from res
+		(
